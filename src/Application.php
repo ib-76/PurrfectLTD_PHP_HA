@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 /**
@@ -14,6 +15,7 @@ declare(strict_types=1);
  * @since     3.3.0
  * @license   https://opensource.org/licenses/mit-license.php MIT License
  */
+
 namespace App;
 
 use Cake\Core\Configure;
@@ -29,7 +31,7 @@ use Cake\ORM\Locator\TableLocator;
 use Cake\Routing\Middleware\AssetMiddleware;
 use Cake\Routing\Middleware\RoutingMiddleware;
 
-use Authentication\AuthenticationService;//******** 
+use Authentication\AuthenticationService; //******** 
 use Authentication\AuthenticationServiceInterface;
 use Authentication\AuthenticationServiceProviderInterface;
 use Authentication\Middleware\AuthenticationMiddleware;
@@ -68,45 +70,48 @@ class Application extends BaseApplication implements AuthenticationServiceProvid
      */
     public function middleware(MiddlewareQueue $middlewareQueue): MiddlewareQueue
     {
+        // Create CSRF middleware with HttpOnly cookies
+        $csrf = new CsrfProtectionMiddleware([
+            'httponly' => true, // prevents JavaScript from reading the cookie
+        ]);
+
+        // Skip CSRF checks for any URL starting with /api
+        // This allows API clients (Postman, JS fetch) to call endpoints without a CSRF token
+        $csrf->skipCheckCallback(function ($request) {
+            return str_starts_with($request->getPath(), '/api');
+        });
+
         $middlewareQueue
-            // Catch any exceptions in the lower layers,
-            // and make an error page/response
+            // Catch exceptions and generate an error page/response
             ->add(new ErrorHandlerMiddleware(Configure::read('Error'), $this))
 
-            // Handle plugin/theme assets like CakePHP normally does.
+            // Serve static assets like CSS/JS/images
             ->add(new AssetMiddleware([
-                'cacheTime' => Configure::read('Asset.cacheTime'),
+                'cacheTime' => Configure::read('Asset.cacheTime'), // cache duration for assets
             ]))
 
-            // Add routing middleware.
-            // If you have a large number of routes connected, turning on routes
-            // caching in production could improve performance.
-            // See https://github.com/CakeDC/cakephp-cached-routing
+            // Enable CakePHP routing
             ->add(new RoutingMiddleware($this))
 
-            // Parse various types of encoded request bodies so that they are
-            // available as array through $request->getData()
-            // https://book.cakephp.org/5/en/controllers/middleware.html#body-parser-middleware
+            // Parse JSON, form-data, and other request bodies automatically
             ->add(new BodyParserMiddleware())
 
-            // Cross Site Request Forgery (CSRF) Protection Middleware
-            // https://book.cakephp.org/5/en/security/csrf.html#cross-site-request-forgery-csrf-middleware
-            ->add(new CsrfProtectionMiddleware([
-                'httponly' => true,
-            ]))
+            // Add CSRF protection middleware
+            // Even though we skip API URLs, normal web forms are still protected
+            ->add($csrf)
 
-
-
-             
-            // Add the AuthenticationMiddleware. It should be after routing and body parser.
-            ->add(new AuthenticationMiddleware($this));//******** 
-
+            // Add authentication middleware for login/session handling
+            // Must come after routing and body parser
+            ->add(new AuthenticationMiddleware($this));
 
         return $middlewareQueue;
     }
 
 
-    public function getAuthenticationService(ServerRequestInterface $request): AuthenticationServiceInterface//*************************** */
+
+
+
+    public function getAuthenticationService(ServerRequestInterface $request): AuthenticationServiceInterface //*************************** */
     {
         $authenticationService = new AuthenticationService([
             'unauthenticatedRedirect' => Router::url('/users/login'),

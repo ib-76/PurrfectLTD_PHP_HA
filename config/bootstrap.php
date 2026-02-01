@@ -40,13 +40,18 @@ use Cake\Datasource\ConnectionManager;
 use Cake\Error\ErrorTrap;
 use Cake\Error\ExceptionTrap;
 use Cake\Http\ServerRequest;
-use Cake\Log\Log;
+      use Cake\Log\Log;
 use Cake\Mailer\Mailer;
 use Cake\Mailer\TransportFactory;
 use Cake\Routing\Router;
 use Cake\Utility\Security;
 use Detection\MobileDetect;
 use function Cake\Core\env;
+
+
+
+
+use Cake\Log\Engine\FileLog;
 
 /*
  * Load global functions for collections, translations, debugging etc.
@@ -248,3 +253,11 @@ ServerRequest::addDetector('tablet', function ($request) {
 // and https://unicode-org.github.io/icu/userguide/format_parse/datetime/#datetime-format-syntax
 // \Cake\I18n\Date::setToStringFormat('dd.MM.yyyy');
 // \Cake\I18n\Time::setToStringFormat('dd.MM.yyyy HH:mm');
+
+Log::setConfig('pets', [
+    'className' => FileLog::class,
+    'path' => LOGS,
+    'levels' => ['info', 'notice'],
+    'scopes' => ['pet'],
+    'file' => 'pets',
+]);

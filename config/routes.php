@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Routes configuration.
  *
@@ -29,6 +30,7 @@ use Cake\Routing\RouteBuilder;
  * So you can use `$this` to reference the application class instance
  * if required.
  */
+
 return function (RouteBuilder $routes): void {
     /*
      * The default class to use for all routes
@@ -56,10 +58,10 @@ return function (RouteBuilder $routes): void {
          * to use (in this case, templates/Pages/home.php)...
          */
         $builder->connect('/', ['controller' => 'Pages', 'action' => 'purrfecthome']);
-         $builder->connect('/users', ['controller' => 'Users', 'action' => 'index']);
-         $builder->connect('/pets', ['controller' => 'Pets', 'action' => 'index']);
-          $builder->connect('/pet/{petslug}', ['controller' => 'Pets', 'action' => 'detail'])
-        ->setPass(['petslug']);
+        $builder->connect('/users', ['controller' => 'Users', 'action' => 'index']);
+        $builder->connect('/pets', ['controller' => 'Pets', 'action' => 'index']);
+        $builder->connect('/pet/{petslug}', ['controller' => 'Pets', 'action' => 'detail'])
+            ->setPass(['petslug']);
 
         /*
          * ...and connect the rest of 'Pages' controller's URLs.
@@ -81,6 +83,14 @@ return function (RouteBuilder $routes): void {
          */
         $builder->fallbacks();
     });
+   
+    //its purpose for REST API
+    $routes->scope('/', function (RouteBuilder $routes) {
+        $routes->setExtensions(['json']);
+        $routes->resources('Api'); //Controller name
+    });
+
+
 
     /*
      * If you need a different set of middleware or none at all,
