@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 /**
@@ -40,7 +41,7 @@ use Cake\Datasource\ConnectionManager;
 use Cake\Error\ErrorTrap;
 use Cake\Error\ExceptionTrap;
 use Cake\Http\ServerRequest;
-      use Cake\Log\Log;
+use Cake\Log\Log;
 use Cake\Mailer\Mailer;
 use Cake\Mailer\TransportFactory;
 use Cake\Routing\Router;
@@ -56,6 +57,7 @@ use Cake\Log\Engine\FileLog;
 /*
  * Load global functions for collections, translations, debugging etc.
  */
+
 require CAKE . 'functions.php';
 
 /*
@@ -174,8 +176,8 @@ if (!$fullBaseUrl) {
     if (!Configure::read('debug') && $httpHost) {
         throw new CakeException(
             'SECURITY: App.fullBaseUrl is not configured. ' .
-            'This is required in production to prevent Host Header Injection attacks. ' .
-            'Set APP_FULL_BASE_URL environment variable or configure App.fullBaseUrl in config/app.php',
+                'This is required in production to prevent Host Header Injection attacks. ' .
+                'Set APP_FULL_BASE_URL environment variable or configure App.fullBaseUrl in config/app.php',
         );
     }
 
@@ -257,7 +259,27 @@ ServerRequest::addDetector('tablet', function ($request) {
 Log::setConfig('pets', [
     'className' => FileLog::class,
     'path' => LOGS,
-    'levels' => ['info', 'notice'],
+    'levels' => ['info', 'error'],
     'scopes' => ['pet'],
     'file' => 'pets',
+    'formatter' => ['className' => 'Cake\Log\Formatter\JsonFormatter',],
 ]);
+
+Log::setConfig('users', [
+    'className' => FileLog::class,
+    'path' => LOGS,
+    'levels' => ['info', 'error'],
+    'scopes' => ['user'],
+    'file' => 'users',
+    'formatter' => ['className' => 'Cake\Log\Formatter\JsonFormatter',],
+]);
+
+Log::setConfig('likes', [
+    'className' => FileLog::class,
+    'path' => LOGS,
+    'levels' => ['info', 'error'],
+    'scopes' => ['like'],
+    'file' => 'likes',
+    'formatter' => ['className' => 'Cake\Log\Formatter\JsonFormatter',],
+]);
+

@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use Cake\Event\EventInterface;
+use Cake\Log\Log;
 
 class PetsController extends AppController
 {
@@ -54,71 +55,104 @@ class PetsController extends AppController
         $this->set(compact('pet', 'likesData'));
     }
 
+
     public function add()
     {
-
-        // Get the Pets table
         $petsTable = $this->fetchTable("Pets");
 
-
-        // Check if the form was submitted
-        if ($this->request->is("post")) {
-
-            // Get the POST data
+        if ($this->request->is('post')) {
             $data = $this->request->getData();
 
             // Handle uploaded image
             $uploadedFile = $data['pet_image'] ?? null;
-
             if ($uploadedFile instanceof \Laminas\Diactoros\UploadedFile && $uploadedFile->getError() === UPLOAD_ERR_OK) {
                 $data['pet_image'] = file_get_contents($uploadedFile->getStream()->getMetadata('uri'));
             } else {
-                $data['pet_image'] = null; // optional: handle empty file
+                $data['pet_image'] = null;
             }
 
-            // Get logged-in user ID
+            // Add user ID if logged in
             $identity = $this->request->getAttribute('identity');
-
             if ($identity) {
-                $data['user_id'] = $identity->getIdentifier(); // usually the users.id
+                $data['user_id'] = $identity->getIdentifier();
             }
 
-            // Create a new Pet entity
             $newPet = $petsTable->newEntity($data);
 
-            // Try saving
-            if ($petsTable->save($newPet)) {
-                $this->Flash->success("Pet has been added successfully!");
+            // Try to save — no exceptions, just check result
+            $saved = $petsTable->save($newPet);
+
+            if ($saved) {
+                // ✅ Log success
+                Log::info(
+                    sprintf(
+                        'User %d added pet %d (%s)',
+                        $identity ? $identity->getIdentifier() : null,
+                        $newPet->id,
+                        $newPet->pet_name
+                    ),
+                    ['scope' => 'pet']
+                );
+
+                $this->Flash->success('Pet has been added successfully!');
                 return $this->redirect(['controller' => 'Pages', 'action' => 'purrfecthome']);
             } else {
-                // Collect validation errors
-                $errors = $newPet->getErrors();
+                // Log failure (validation errors or DB issues)
+                $errors = $newPet->getErrors(); // Validation errors
                 $errorMessages = '';
+
                 foreach ($errors as $error) {
                     $errorMessages .= " - " . array_values($error)[0] . "<br>";
                 }
 
+
+                  Log::error(
+                    sprintf(
+                        'User %d added pet %d (%s) cause the following error : %s',
+                        $identity ? $identity->getIdentifier() : null,
+                        $newPet->id,
+                        $newPet->pet_name,
+                        $errorMessages
+                    ),
+                    ['scope' => 'pet']
+                );
+
                 $this->Flash->error("Error saving pet!<br>$errorMessages", ['escape' => false]);
+                return $this->redirect(['controller' => 'Pages', 'action' => 'purrfecthome']);
             }
         }
     }
 
 
 
-
     public function delete($id)
     {
+        $petId= $this->request->getAttribute('identity');
+        
+       
         $petTodelete = $this->Pets->find()->where(['id' => $id])->first();
 
         if ($petTodelete != null) {
-            if ($this->Pets->delete($petTodelete)) {
-                $this->Flash->success($petTodelete->pet_name . " deleted!");
-            } else {
-                $this->Flash->error("Something wrong happened while deleting the pet.");
-            }
-        } else {
-            $this->Flash->error("Pet does not exist!");
-        }
+    if ($this->Pets->delete($petTodelete)) {
+        // ✅ Log success
+        Log::info(
+            sprintf(
+                'User (Id:%d) %s deleted pet %s (Id:%d)',
+                $petId ? $petId->getIdentifier() : 0,
+                $petId->user_email,
+                $petTodelete->pet_name,
+                $petTodelete->id
+            ),
+            ['scope' => 'pet']
+        );
+
+        $this->Flash->success($petTodelete->pet_name . " deleted!");
+    } else {
+        $this->Flash->error("Something wrong happened while deleting the pet.");
+    }
+} else {
+    $this->Flash->error("Pet does not exist!");
+}
 
         // NO VIEW IS REQUIRED
         return $this->redirect(['controller' => 'Pages', 'action' => 'purrfecthome']);

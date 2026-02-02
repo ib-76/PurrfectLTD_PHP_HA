@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use Cake\View\JsonView;
+use Cake\Log\Log;
 
 class ApiController extends AppController
 {
@@ -91,38 +92,111 @@ public function add()
 {
     $this->request->allowMethod(['post']);
     $petsTable = $this->fetchTable('Pets');
-    $data = $this->request->getData();
+    $identity = $this->Authentication->getIdentity();
 
-    // Use the same working logic as your app
+    $data = $this->request->getData();
+ // ========================
+    // Require user_id from Postman
+    // ========================
+    if (empty($data['user_id'])) {
+        $this->set([
+            'response' => [
+                'status' => 'error',
+                'message' => 'user_id is required'
+            ]
+        ]);
+        $this->viewBuilder()->setOption('serialize', ['response']);
+        return;
+    }
+
+    // ========================
+    // Handle uploaded image
+    // ========================
     $uploadedFile = $data['pet_image'] ?? null;
+
     if ($uploadedFile instanceof \Laminas\Diactoros\UploadedFile && $uploadedFile->getError() === UPLOAD_ERR_OK) {
-        // Stream uploaded file directly into DB BLOB
+        // Multipart/form-data upload (web form or proper API)
         $data['pet_image'] = file_get_contents($uploadedFile->getStream()->getMetadata('uri'));
+
+    } elseif (is_string($uploadedFile) && str_starts_with($uploadedFile, 'data:image/')) {
+        // Base64 image in JSON
+        // Format: "data:image/jpeg;base64,...."
+        $parts = explode(',', $uploadedFile);
+        if (isset($parts[1])) {
+            $data['pet_image'] = base64_decode($parts[1]);
+        } else {
+            $data['pet_image'] = null;
+        }
+
     } else {
+        // Missing image
         $response = [
             'status' => 'error',
-            'message' => 'Pet image is required',
+            'message' => 'Pet image is required'
         ];
         $this->set(compact('response'));
         $this->viewBuilder()->setOption('serialize', ['response']);
         return;
     }
 
+    // ========================
     // Create and save entity
+    // ========================
     $newPet = $petsTable->newEntity($data);
-    $petsTable->save($newPet);
 
-    // Return JSON
-    $this->set([
-        'response' => [
+    if ($petsTable->save($newPet)) {
+        // ✅ Log success
+        Log::info(
+            sprintf(
+                'User %d (%s) added pet %s.',
+                $identity->id ?? 0,
+                $identity->name ?? 'Unknown',
+                $newPet->pet_name
+            ),
+            ['scope' => 'pet']
+        );
+
+        $response = [
             'status' => 'success',
             'message' => 'Pet added successfully',
-            'pet' => $newPet
-        ]
-    ]);
+            'pet' => [
+                'id' => $newPet->id,
+                'name' => $newPet->pet_name,
+                'type' => $newPet->pet_type,
+                
+            ]
+        ];
+
+    } else {
+        // ✅ Log failure with validation errors
+        $errors = $newPet->getErrors();
+        $errorMessages = '';
+        foreach ($errors as $field => $fieldErrors) {
+            foreach ($fieldErrors as $msg) {
+                $errorMessages .= $msg . '; ';
+            }
+        }
+
+        Log::error(
+            sprintf(
+                'User %d (%s) failed to add pet. Errors: %s',
+                $identity->id ?? 0,
+                $identity->name ?? 'Unknown',
+                $errorMessages
+            ),
+            ['scope' => 'pet']
+        );
+
+        $response = [
+            'status' => 'error',
+            'message' => 'Failed to save pet',
+            'errors' => $errors
+        ];
+    }
+
+    // Return JSON response
+    $this->set(compact('response'));
     $this->viewBuilder()->setOption('serialize', ['response']);
 }
-
-
 
 }

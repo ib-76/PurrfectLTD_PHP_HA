@@ -1,32 +1,33 @@
 <?php
+
 namespace App\Controller;
 
 use Cake\Event\EventInterface;
+use Cake\Log\Log;
 
 class UsersController extends AppController
 {
-public function beforeFilter(EventInterface $event): void
-{
-    parent::beforeFilter($event);
+    public function beforeFilter(EventInterface $event): void
+    {
+        parent::beforeFilter($event);
 
-    // Allow unauthenticated users for login and addUser
-    $this->Authentication->addUnauthenticatedActions([
-        'login', 'add'
-    ]);
-
-  
-}
+        // Allow unauthenticated users for login and addUser
+        $this->Authentication->addUnauthenticatedActions([
+            'login',
+            'add'
+        ]);
+    }
     public function index()
     {
         $Users = $this->fetchTable('Users');
         $allUsers = $Users->find()->all();
 
         // Get currently logged-in user identity
-    $identity = $this->Authentication->getIdentity();
-    $loggedUser = $identity ?? null;
+        $identity = $this->Authentication->getIdentity();
+        $loggedUser = $identity ?? null;
 
-    // Pass both users and loggedUser to the view
-    $this->set(compact('allUsers', 'loggedUser'));
+        // Pass both users and loggedUser to the view
+        $this->set(compact('allUsers', 'loggedUser'));
     }
 
     public function banUser($userId)
@@ -50,40 +51,62 @@ public function beforeFilter(EventInterface $event): void
         return $this->redirect(['action' => 'index']);
     }
 
-   public function login()
-{
-    $this->request->allowMethod(['get', 'post']);
-    $result = $this->Authentication->getResult();
-
-    // Already logged in
-    if ($result && $result->isValid()) {
-
+    public function login()
+    {
+       
+        $this->request->allowMethod(['get', 'post']);
+        $result = $this->Authentication->getResult();
         $user = $result->getData(); // get the logged-in user entity
 
-        // Check if banned
-        if ($user->is_banned) {
-            $this->Authentication->logout();
-            $this->Flash->error('Your account has been banned.');
-            return $this->redirect(['action' => 'login']);
+
+        // Already logged in
+        if ($result && $result->isValid()) {
+
+          
+
+            // Check if banned
+            if ($user->is_banned) {
+                $this->Authentication->logout();
+                $this->Flash->error('Your account has been banned.');
+                return $this->redirect(['action' => 'login']);
+            }
+
+
+
+            // Log successful login
+            Log::info(
+                sprintf('User %s (%s) logged in successfully.', $user->first_name, $user->user_email),
+                ['scope' => 'user']
+            );
+
+
+            // Successful login, not banned
+            return $this->redirect(['controller' => 'Pages', 'action' => 'purrfecthome',]);
         }
 
-        // Successful login, not banned
-        return $this->redirect([
-            'controller' => 'Pages',
-            'action' => 'purrfecthome',
-        ]);
-    }
+        // Login attempt failed
+        if ($this->request->is('post') && (!$result || !$result->isValid())) {
+            // Login failed logging
+            Log::error(
+                sprintf('Failed login attempt for email'),
+                ['scope' => 'user']
+            );
 
-    // Login attempt failed
-    if ($this->request->is('post') && (!$result || !$result->isValid())) {
-        $this->Flash->error('Invalid email or password.');
+
+            $this->Flash->error('Invalid email or password.');
+        }
     }
-}
     public function logout()
     {
         $result = $this->Authentication->getResult();
-
+        $user = $result->getData(); 
         if ($result && $result->isValid()) {
+           // Logout successful login
+            Log::info(
+                sprintf('User %s (%s) logged out successfully.', $user->first_name, $user->user_email),
+                ['scope' => 'user']
+            );
+
             $this->Authentication->logout();
         }
 
@@ -102,7 +125,7 @@ public function beforeFilter(EventInterface $event): void
 
             if ($Users->save($user)) {
                 $this->Flash->success('User has been saved!');
-                return $this->redirect([ 'controller' => 'Pages','action' => 'purrfecthome']);
+                return $this->redirect(['controller' => 'Pages', 'action' => 'purrfecthome']);
             }
 
             $errors = $user->getErrors();
